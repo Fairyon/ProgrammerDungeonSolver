@@ -1,9 +1,8 @@
 #pragma once
 
-#include <algorithm>
-#include <execution>
 #include <iostream>
 #include <vector>
+#include <thread>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/preprocessor.hpp>
 
@@ -162,25 +161,29 @@ public:
 		}
 	}
 
+
+	int last_loop_start_offset = 0;
+	int lastCheckedMove = 0;
+
 	bool checkPath(vector<Movement> path) {
-		auto last_loop_start = path.begin();
-		for (auto it = path.begin(); it != path.end(); it++) {
+		for (auto it = path.begin() + lastCheckedMove; it != path.end(); it++) {
+			lastCheckedMove = it - path.begin() + 1;
 			switch (*it)
 			{
 				case Movement::loop_start:
-					last_loop_start = it;
+					last_loop_start_offset = it - path.begin();
 					continue;
 				case Movement::loop_end2:
 					*it = Movement::loop_finish;
-					it = last_loop_start;
+					it = path.begin() + last_loop_start_offset;
 					continue;
 				case Movement::loop_end3:
 					*it = Movement::loop_end2;
-					it = last_loop_start;
+					it = path.begin() + last_loop_start_offset;
 					continue;
 				case Movement::loop_end4:
 					*it = Movement::loop_end3;
-					it = last_loop_start;
+					it = path.begin() + last_loop_start_offset;
 					continue;
 				case Movement::loop_finish:
 					continue;
@@ -197,11 +200,12 @@ public:
 		return false;
 	}
 
-	bool analyzePath(vector<Movement>& path, int num_daggers, int loop_starts) {
+	bool analyzePath(Playground helper, vector<Movement>& path, int num_daggers, int loop_starts) {
+		bool pathCheck = helper.checkPath(path);
+		if (!helper.player.alive) return false;
 		if (path.size() == maxPathSize) {
 			if (loop_starts > 0) return false;
-			Playground helper = *this;
-			if (helper.checkPath(path)) {
+			if (pathCheck) {
 				cout << "!!!!!!!" << endl;
 				printPath(path);
 				keep_running = false;
@@ -233,12 +237,11 @@ public:
 					num_daggers--;
 					break;
 			}
-			path.push_back(move);
+			path.emplace_back(move);
 			if (path.size() == 4)
 				printPath(path);
-			//cout << "." << endl;
 
-			if (analyzePath(path, num_daggers, next_loop_starts)) {
+			if (analyzePath(helper, path, num_daggers, next_loop_starts)) {
 				return true;
 			}
 			path.pop_back();
@@ -248,44 +251,49 @@ public:
 	}
 
 	void analyzePathStart(vector<Movement>& path, int& num_daggers, int& loop_starts) {
-		std::for_each(
-			std::execution::par,
-			allMovements.begin(),
-			allMovements.end(),
-			[&](const auto& move)
-			{
-				if (!keep_running) return;
+		std::vector<std::thread> threads;
 
-				int next_loop_starts = loop_starts;
-				int next_num_daggers = num_daggers;
-
-				switch (move)
+		for (Movement move : allMovements) {
+			threads.push_back(std::thread(
+				[&, move]()
 				{
-					case Movement::loop_finish:
-						return;
-					case Movement::loop_start:
-						if (loop_starts > 0 || path.size() > (size_t)maxPathSize - 3) return;
-						next_loop_starts = loop_starts + 1;
-						break;
-					case Movement::loop_end2:
-					case Movement::loop_end3:
-					case Movement::loop_end4:
-						if (loop_starts == 0 || path.back() == Movement::loop_start) return;
-						next_loop_starts = loop_starts - 1;
-						break;
-					case Movement::dagger:
-						//if (num_daggers == 0) return;
-						next_num_daggers--;
-						break;
-				}
+					if (!keep_running) return;
 
-				vector<Movement> next_path = path;
+					int next_loop_starts = loop_starts;
+					int next_num_daggers = num_daggers;
 
-				next_path.push_back(move);
+					switch (move)
+					{
+						case Movement::loop_finish:
+							return;
+						case Movement::loop_start:
+							if (loop_starts > 0 || path.size() > (size_t)maxPathSize - 3) return;
+							next_loop_starts = loop_starts + 1;
+							break;
+						case Movement::loop_end2:
+						case Movement::loop_end3:
+						case Movement::loop_end4:
+							if (loop_starts == 0 || path.back() == Movement::loop_start) return;
+							next_loop_starts = loop_starts - 1;
+							break;
+						case Movement::dagger:
+							//if (num_daggers == 0) return;
+							next_num_daggers--;
+							break;
+					}
 
-				analyzePath(next_path, next_num_daggers, next_loop_starts);
-			}
-		);
+					vector<Movement> next_path = path;
+
+					next_path.emplace_back(move);
+
+					analyzePath(*this, next_path, next_num_daggers, next_loop_starts);
+				})
+			);
+		}
+
+		for (auto& th : threads) {
+			th.join();
+		}
 	}
 
 	void printPath(vector<Movement> path) {
@@ -299,7 +307,8 @@ public:
 		vector<Movement> result;
 		int loop_starts = 0;
 
-		analyzePathStart(result, daggers, loop_starts);
+		//analyzePathStart(result, daggers, loop_starts);
+		analyzePath(*this, result, daggers, loop_starts);
 
 		return result;
 	}
