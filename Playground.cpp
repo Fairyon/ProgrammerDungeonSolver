@@ -15,3 +15,5 @@ Direction operator--(Direction& d, int) {
 		d = Direction(d - 1);
 	return d;
 }
+
+bool Playground::keep_running = true;

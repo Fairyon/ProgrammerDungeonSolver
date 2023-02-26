@@ -1,10 +1,11 @@
 #pragma once
 
+#include <algorithm>
+#include <execution>
 #include <iostream>
 #include <vector>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/preprocessor.hpp>
-#include "ParallelExcecution.h"
 
 #define MOVE_ENUM_MACRO(v1, v2, v3, v4, v5, v6, v7, v8, v9, v10)\
 	enum Movement { v1, v2, v3, v4, v5, v6, v7, v8, v9, v10 };\
@@ -62,6 +63,7 @@ struct Player
 class Playground
 {
 public:
+	static bool keep_running;
 	vector<vector<CellType>> field;
 	Player player;
 	int monsters = 0;
@@ -160,13 +162,9 @@ public:
 		}
 	}
 
-	int lastCheckedMove = -1;
-
 	bool checkPath(vector<Movement> path) {
-		int last_loop_start_pos = find(path.rbegin(), path.rend(), Movement::loop_start) - path.rend();
-		if (last_loop_start_pos < 0) last_loop_start_pos = 0;
-		auto last_loop_start = path.begin() + last_loop_start_pos;
-		for (auto it = path.begin() + (lastCheckedMove + 1); it != path.end(); it++) {
+		auto last_loop_start = path.begin();
+		for (auto it = path.begin(); it != path.end(); it++) {
 			switch (*it)
 			{
 				case Movement::loop_start:
@@ -183,16 +181,13 @@ public:
 				case Movement::loop_end4:
 					*it = Movement::loop_end3;
 					it = last_loop_start;
-					lastCheckedMove = it - path.begin();
 					continue;
 				case Movement::loop_finish:
-					lastCheckedMove = it - path.begin();
 					continue;
 				default:
 					doMove(*it);
 			}
 			if (!player.alive) return false;
-			lastCheckedMove = it - path.begin();
 		}
 		if (monsters == 0) return true;
 		if (monsters == 1) {
@@ -202,15 +197,23 @@ public:
 		return false;
 	}
 
-	bool analyzePath(Playground helper, vector<Movement>& path, int num_daggers, int loop_starts) {
-		bool pathCheck = path.empty() ? true : helper.checkPath(path);
-		if (!helper.player.alive) return false;
+	bool analyzePath(vector<Movement>& path, int num_daggers, int loop_starts) {
 		if (path.size() == maxPathSize) {
 			if (loop_starts > 0) return false;
-			return pathCheck;
+			Playground helper = *this;
+			if (helper.checkPath(path)) {
+				cout << "!!!!!!!" << endl;
+				printPath(path);
+				keep_running = false;
+				return true;
+			}
+			return false;
 		}
+
 		int next_loop_starts = loop_starts;
 		for (Movement move : allMovements) {
+			if (!keep_running) return false;
+
 			switch (move)
 			{
 				case Movement::loop_finish:
@@ -233,14 +236,56 @@ public:
 			path.push_back(move);
 			if (path.size() == 4)
 				printPath(path);
+			//cout << "." << endl;
 
-			if (analyzePath(helper, path, num_daggers, next_loop_starts)) {
+			if (analyzePath(path, num_daggers, next_loop_starts)) {
 				return true;
 			}
 			path.pop_back();
 			next_loop_starts = loop_starts;
 		}
 		return false;
+	}
+
+	void analyzePathStart(vector<Movement>& path, int& num_daggers, int& loop_starts) {
+		std::for_each(
+			std::execution::par,
+			allMovements.begin(),
+			allMovements.end(),
+			[&](const auto& move)
+			{
+				if (!keep_running) return;
+
+				int next_loop_starts = loop_starts;
+				int next_num_daggers = num_daggers;
+
+				switch (move)
+				{
+					case Movement::loop_finish:
+						return;
+					case Movement::loop_start:
+						if (loop_starts > 0 || path.size() > (size_t)maxPathSize - 3) return;
+						next_loop_starts = loop_starts + 1;
+						break;
+					case Movement::loop_end2:
+					case Movement::loop_end3:
+					case Movement::loop_end4:
+						if (loop_starts == 0 || path.back() == Movement::loop_start) return;
+						next_loop_starts = loop_starts - 1;
+						break;
+					case Movement::dagger:
+						//if (num_daggers == 0) return;
+						next_num_daggers--;
+						break;
+				}
+
+				vector<Movement> next_path = path;
+
+				next_path.push_back(move);
+
+				analyzePath(next_path, next_num_daggers, next_loop_starts);
+			}
+		);
 	}
 
 	void printPath(vector<Movement> path) {
@@ -254,8 +299,7 @@ public:
 		vector<Movement> result;
 		int loop_starts = 0;
 
-		analyzePath(*this, result, daggers, loop_starts);
-		printPath(result);
+		analyzePathStart(result, daggers, loop_starts);
 
 		return result;
 	}
