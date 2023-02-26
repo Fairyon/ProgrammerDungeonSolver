@@ -29,7 +29,7 @@ enum Direction {
 };
 
 MOVE_ENUM_MACRO(
-	attack, attack2, dagger, rotate_right, rotate_left, loop_start, loop_end2, loop_end3, loop_end4, loop_finish
+	loop_start, attack, attack2, dagger, rotate_right, rotate_left, loop_end2, loop_end3, loop_end4, loop_finish
 )
 
 Direction operator++(Direction& d, int);
@@ -192,6 +192,7 @@ public:
 
 	bool analyzePath(vector<Movement>& path, int num_daggers, int loop_starts, int& path_size) {
 		if (path.size() == path_size) {
+			if (loop_starts > 0) return false;
 			Playground helper = *this;
 			return helper.checkPath(path);
 		}
@@ -208,7 +209,7 @@ public:
 				case Movement::loop_end2:
 				case Movement::loop_end3:
 				case Movement::loop_end4:
-					if (loop_starts == 0) continue;
+					if (loop_starts == 0 || path.back() == Movement::loop_start) continue;
 					next_loop_starts = loop_starts - 1;
 					break;
 				case Movement::dagger:
@@ -218,10 +219,12 @@ public:
 			}
 			path.push_back(move);
 			printPath(path);
+
 			if (analyzePath(path, num_daggers, next_loop_starts, path_size)) {
 				return true;
 			}
 			path.pop_back();
+			next_loop_starts = loop_starts;
 		}
 		return false;
 	}
