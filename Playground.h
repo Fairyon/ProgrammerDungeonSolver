@@ -4,12 +4,13 @@
 #include <vector>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/preprocessor.hpp>
+#include "ParallelExcecution.h"
 
 #define MOVE_ENUM_MACRO(v1, v2, v3, v4, v5, v6, v7, v8, v9, v10)\
 	enum Movement { v1, v2, v3, v4, v5, v6, v7, v8, v9, v10 };\
 	static const char* MovementStrings[] = { #v1, #v2, #v3, #v4, #v5, #v6, #v7, #v8, #v9, #v10 }; \
 	constexpr const char* MovementToString(Movement value) { return MovementStrings[static_cast<int>(value)]; } \
-	static const auto allMovements = { v1, v2, v3, v4, v5, v6, v7, v8, v9, v10 };
+	static const vector<Movement> allMovements = { v1, v2, v3, v4, v5, v6, v7, v8, v9, v10 };
 
 /*#define MOVE_ENUM_MACRO(...)\
 	enum Movement { __VA_ARGS__ };\
@@ -29,7 +30,7 @@ enum Direction {
 };
 
 MOVE_ENUM_MACRO(
-	loop_start, attack, attack2, dagger, rotate_right, rotate_left, loop_end2, loop_end3, loop_end4, loop_finish
+	loop_start, dagger, rotate_right, rotate_left, attack, attack2, loop_end2, loop_end3, loop_end4, loop_finish
 )
 
 Direction operator++(Direction& d, int);
@@ -159,9 +160,13 @@ public:
 		}
 	}
 
+	int lastCheckedMove = -1;
+
 	bool checkPath(vector<Movement> path) {
-		auto last_loop_start = path.begin();
-		for (auto it = path.begin(); it != path.end(); it++) {
+		int last_loop_start_pos = find(path.rbegin(), path.rend(), Movement::loop_start) - path.rend();
+		if (last_loop_start_pos < 0) last_loop_start_pos = 0;
+		auto last_loop_start = path.begin() + last_loop_start_pos;
+		for (auto it = path.begin() + (lastCheckedMove + 1); it != path.end(); it++) {
 			switch (*it)
 			{
 				case Movement::loop_start:
@@ -178,23 +183,31 @@ public:
 				case Movement::loop_end4:
 					*it = Movement::loop_end3;
 					it = last_loop_start;
+					lastCheckedMove = it - path.begin();
 					continue;
 				case Movement::loop_finish:
+					lastCheckedMove = it - path.begin();
 					continue;
 				default:
 					doMove(*it);
 			}
 			if (!player.alive) return false;
+			lastCheckedMove = it - path.begin();
 		}
 		if (monsters == 0) return true;
+		if (monsters == 1) {
+			cout << "1 monster!: ";
+			printPath(path);
+		}
 		return false;
 	}
 
-	bool analyzePath(vector<Movement>& path, int num_daggers, int loop_starts, int& path_size) {
-		if (path.size() == path_size) {
+	bool analyzePath(Playground helper, vector<Movement>& path, int num_daggers, int loop_starts) {
+		bool pathCheck = path.empty() ? true : helper.checkPath(path);
+		if (!helper.player.alive) return false;
+		if (path.size() == maxPathSize) {
 			if (loop_starts > 0) return false;
-			Playground helper = *this;
-			return helper.checkPath(path);
+			return pathCheck;
 		}
 		int next_loop_starts = loop_starts;
 		for (Movement move : allMovements) {
@@ -203,7 +216,7 @@ public:
 				case Movement::loop_finish:
 					continue;
 				case Movement::loop_start:
-					if (loop_starts > 0 || path.size() > (size_t)path_size - 3) continue;
+					if (loop_starts > 0 || path.size() > (size_t)maxPathSize - 3) continue;
 					next_loop_starts = loop_starts + 1;
 					break;
 				case Movement::loop_end2:
@@ -213,14 +226,15 @@ public:
 					next_loop_starts = loop_starts - 1;
 					break;
 				case Movement::dagger:
-					if (num_daggers == 0) continue;
+					//if (num_daggers == 0) continue;
 					num_daggers--;
 					break;
 			}
 			path.push_back(move);
-			printPath(path);
+			if (path.size() == 4)
+				printPath(path);
 
-			if (analyzePath(path, num_daggers, next_loop_starts, path_size)) {
+			if (analyzePath(helper, path, num_daggers, next_loop_starts)) {
 				return true;
 			}
 			path.pop_back();
@@ -240,7 +254,7 @@ public:
 		vector<Movement> result;
 		int loop_starts = 0;
 
-		analyzePath(result, daggers, loop_starts, maxPathSize);
+		analyzePath(*this, result, daggers, loop_starts);
 		printPath(result);
 
 		return result;
