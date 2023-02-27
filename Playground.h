@@ -164,11 +164,9 @@ public:
 
 
 	int last_loop_start_offset = 0;
-	int lastCheckedMove = 0;
 
 	bool checkPath(vector<Movement> path) {
-		for (auto it = path.begin() + lastCheckedMove; it != path.end(); it++) {
-			lastCheckedMove = it - path.begin() + 1;
+		for (auto it = path.end() - 1; it != path.end(); it++) {
 			switch (*it)
 			{
 				case Movement::loop_start:
@@ -204,22 +202,17 @@ public:
 	chrono::steady_clock::time_point begin = chrono::steady_clock::now();
 
 	bool analyzePath(Playground helper, vector<Movement>& path, int num_daggers, int loop_starts) {
-		bool pathCheck = helper.checkPath(path);
-		if (!helper.player.alive) return false;
-		if (path.size() == maxPathSize) {
-			if (loop_starts > 0) return false;
-			if (pathCheck) {
-				cout << "!!!!!!!" << endl;
+		if (!path.empty()) {
+			bool pathCheck = helper.checkPath(path);
+			if (!helper.player.alive) return false;
+			if (pathCheck && loop_starts == 0) {
+				cout << "Working path: " << endl;
 				printPath(path);
-				keep_running = false;
 				return true;
 			}
-			return false;
-		}
-		if (pathCheck) {
-			cout << "!!!!!!!" << endl;
-			printPath(path);
-			return true;
+			if (path.size() == maxPathSize) {
+				return false;
+			}
 		}
 
 		int next_loop_starts = loop_starts;
