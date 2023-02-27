@@ -23,7 +23,7 @@
 using namespace std;
 
 enum CellType {
-	clear, wall, death, monster, monster2, block
+	clear, wall, death, monster, monster2, hole, tile
 };
 
 enum Direction {
@@ -103,7 +103,7 @@ public:
 		Player helper = player;
 		for (int i = 0; i < stepsize; i++) {
 			helper.move();
-			if (field[helper.y][helper.x] == CellType::wall || field[helper.y][helper.x] == CellType::block) break;
+			if (field[helper.y][helper.x] == CellType::wall || field[helper.y][helper.x] == CellType::hole) break;
 			path.push_back(&field[helper.y][helper.x]);
 		}
 		for (CellType* cell : path)
@@ -112,6 +112,7 @@ public:
 			{
 				case CellType::clear: player.move(); break;
 				case CellType::death: player.alive = false; return;
+				case CellType::tile:  *cell = CellType::hole; player.move(); return;
 				case CellType::monster: *cell = CellType::clear; monsters--; player.move(); break;
 				case CellType::monster2: *cell = CellType::monster; break;
 			}
@@ -236,7 +237,7 @@ public:
 					next_loop_starts = loop_starts - 1;
 					break;
 				case Movement::dagger:
-					if (num_daggers == 0) continue;
+					//if (num_daggers == 0) continue;
 					num_daggers--;
 					break;
 			}

@@ -7,7 +7,7 @@
 
 int main()
 {
-	Playground playground = PlaygroundBuilder::getLvl12();
+	Playground playground = PlaygroundBuilder::getLvl20();
 
 	std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 	playground.analyze();

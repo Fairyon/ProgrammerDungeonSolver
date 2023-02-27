@@ -11,6 +11,7 @@ public:
 	static const vector<vector<CellType>> lvl15;
 	static const vector<vector<CellType>> lvl17;
 	static const vector<vector<CellType>> lvl20;
+	static const vector<vector<CellType>> lvl36;
 
 	static Playground getLvl2() {
 		Playground result;
@@ -62,6 +63,15 @@ public:
 		result.setField(lvl20);
 		result.daggers = 8;
 		result.player = { 4, 1, Direction::right };
+		result.maxPathSize = 11;
+		return result;
+	}
+
+	static Playground getLvl36() {
+		Playground result;
+		result.setField(lvl36);
+		result.daggers = 0;
+		result.player = { 2, 1, Direction::right };
 		result.maxPathSize = 11;
 		return result;
 	}
