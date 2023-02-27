@@ -133,7 +133,7 @@ public:
 		{
 			switch (*cell)
 			{
-				case CellType::monster: *cell = CellType::clear; return;
+				case CellType::monster: *cell = CellType::clear; monsters--; return;
 				case CellType::monster2: *cell = CellType::monster; return;
 			}
 		}
