@@ -41,7 +41,7 @@ public:
 		Playground result;
 		result.setField(lvl20);
 		result.daggers = 8;
-		result.player = { 3, 1, Direction::right };
+		result.player = { 4, 1, Direction::right };
 		result.maxPathSize = 11;
 		return result;
 	}

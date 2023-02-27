@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <chrono>
 #include <vector>
 #include <thread>
 #include <boost/algorithm/string/join.hpp>
@@ -200,6 +201,8 @@ public:
 		return false;
 	}
 
+	chrono::steady_clock::time_point begin = chrono::steady_clock::now();
+
 	bool analyzePath(Playground helper, vector<Movement>& path, int num_daggers, int loop_starts) {
 		bool pathCheck = helper.checkPath(path);
 		if (!helper.player.alive) return false;
@@ -212,6 +215,11 @@ public:
 				return true;
 			}
 			return false;
+		}
+		if (pathCheck) {
+			cout << "!!!!!!!" << endl;
+			printPath(path);
+			return true;
 		}
 
 		int next_loop_starts = loop_starts;
@@ -238,8 +246,10 @@ public:
 					break;
 			}
 			path.emplace_back(move);
-			if (path.size() == 4)
+			if (path.size() == 4) {
+				cout << chrono::duration_cast<std::chrono::milliseconds>(chrono::steady_clock::now() - begin).count() / 1000. << " | ";
 				printPath(path);
+			}
 
 			if (analyzePath(helper, path, num_daggers, next_loop_starts)) {
 				return true;
