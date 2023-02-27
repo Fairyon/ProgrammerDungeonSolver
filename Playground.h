@@ -23,7 +23,7 @@
 using namespace std;
 
 enum CellType {
-	clear, wall, death, monster, monster2
+	clear, wall, death, monster, monster2, block
 };
 
 enum Direction {
@@ -31,7 +31,7 @@ enum Direction {
 };
 
 MOVE_ENUM_MACRO(
-	loop_start, dagger, rotate_right, rotate_left, attack, attack2, loop_end2, loop_end3, loop_end4, loop_finish
+	loop_start, attack, attack2, rotate_right, rotate_left, dagger, loop_end2, loop_end3, loop_end4, loop_finish
 )
 
 Direction operator++(Direction& d, int);
@@ -103,7 +103,7 @@ public:
 		Player helper = player;
 		for (int i = 0; i < stepsize; i++) {
 			helper.move();
-			if (field[helper.y][helper.x] == CellType::wall) break;
+			if (field[helper.y][helper.x] == CellType::wall || field[helper.y][helper.x] == CellType::block) break;
 			path.push_back(&field[helper.y][helper.x]);
 		}
 		for (CellType* cell : path)
@@ -192,10 +192,12 @@ public:
 			if (!player.alive) return false;
 		}
 		if (monsters == 0) return true;
+#if 0
 		if (monsters == 1) {
 			cout << "1 monster!: ";
 			printPath(path);
 		}
+#endif
 		return false;
 	}
 
@@ -206,7 +208,7 @@ public:
 			bool pathCheck = helper.checkPath(path);
 			if (!helper.player.alive) return false;
 			if (pathCheck && loop_starts == 0) {
-				cout << "Working path: " << endl;
+				cout << path.size() << " | Working path: ";
 				printPath(path);
 				return true;
 			}
@@ -234,7 +236,7 @@ public:
 					next_loop_starts = loop_starts - 1;
 					break;
 				case Movement::dagger:
-					//if (num_daggers == 0) continue;
+					if (num_daggers == 0) continue;
 					num_daggers--;
 					break;
 			}
@@ -245,58 +247,15 @@ public:
 			}
 
 			if (analyzePath(helper, path, num_daggers, next_loop_starts)) {
+				/*path.pop_back();
+				next_loop_starts = loop_starts;
+				break;*/
 				return true;
 			}
 			path.pop_back();
 			next_loop_starts = loop_starts;
 		}
 		return false;
-	}
-
-	void analyzePathStart(vector<Movement>& path, int& num_daggers, int& loop_starts) {
-		std::vector<std::thread> threads;
-
-		for (Movement move : allMovements) {
-			threads.push_back(std::thread(
-				[&, move]()
-				{
-					if (!keep_running) return;
-
-					int next_loop_starts = loop_starts;
-					int next_num_daggers = num_daggers;
-
-					switch (move)
-					{
-						case Movement::loop_finish:
-							return;
-						case Movement::loop_start:
-							if (loop_starts > 0 || path.size() > (size_t)maxPathSize - 3) return;
-							next_loop_starts = loop_starts + 1;
-							break;
-						case Movement::loop_end2:
-						case Movement::loop_end3:
-						case Movement::loop_end4:
-							if (loop_starts == 0 || path.back() == Movement::loop_start) return;
-							next_loop_starts = loop_starts - 1;
-							break;
-						case Movement::dagger:
-							//if (num_daggers == 0) return;
-							next_num_daggers--;
-							break;
-					}
-
-					vector<Movement> next_path = path;
-
-					next_path.emplace_back(move);
-
-					analyzePath(*this, next_path, next_num_daggers, next_loop_starts);
-				})
-			);
-		}
-
-		for (auto& th : threads) {
-			th.join();
-		}
 	}
 
 	void printPath(vector<Movement> path) {
@@ -310,7 +269,6 @@ public:
 		vector<Movement> result;
 		int loop_starts = 0;
 
-		//analyzePathStart(result, daggers, loop_starts);
 		analyzePath(*this, result, daggers, loop_starts);
 
 		return result;
